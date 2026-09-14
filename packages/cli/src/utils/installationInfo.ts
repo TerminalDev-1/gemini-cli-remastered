@@ -202,15 +202,11 @@ export function getInstallationInfo(
       };
     }
 
-    // Assume global npm
-    const updateCommand = 'npm install -g @google/gemini-cli@latest';
+    // This private fork is updated only from its local build tree.
     return {
       packageManager: PackageManager.NPM,
       isGlobal: true,
-      updateCommand,
-      updateMessage: isAutoUpdateEnabled
-        ? 'Installed with npm. Attempting to automatically update now...'
-        : `Please run ${updateCommand} to update`,
+      updateMessage: 'Rebuild the local fork, then restart to update.',
     };
   } catch (error) {
     debugLogger.log(error);

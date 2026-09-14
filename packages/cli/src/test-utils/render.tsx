@@ -530,6 +530,7 @@ const baseMockUiState = {
   bannerVisible: false,
   nightly: false,
   updateInfo: null,
+  whatsChanged: null,
   pendingHistoryItems: [],
   mainControlsRef: () => {},
   rootUiRef: { current: null },
@@ -579,8 +580,6 @@ const mockUIActions: UIActions = {
   setQueueErrorMessage: vi.fn(),
   addMessage: vi.fn(),
   popAllMessages: vi.fn(),
-  handleApiKeySubmit: vi.fn(),
-  handleApiKeyCancel: vi.fn(),
   setBannerVisible: vi.fn(),
   setShortcutsHelpVisible: vi.fn(),
   setCleanUiDetailsVisible: vi.fn(),
@@ -602,6 +601,8 @@ const mockUIActions: UIActions = {
   getPreferredEditor: vi.fn(),
   clearAccountSuspension: vi.fn(),
   setVoiceModeEnabled: vi.fn(),
+  dismissUpdateInfo: vi.fn(),
+  dismissWhatsChanged: vi.fn(),
 };
 
 import { type TextBuffer } from '../ui/components/shared/text-buffer.js';

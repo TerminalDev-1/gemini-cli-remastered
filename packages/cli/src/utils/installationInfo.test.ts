@@ -211,7 +211,6 @@ describe('getInstallationInfo', () => {
       throw new Error('Command failed');
     });
 
-    // isAutoUpdateEnabled = true -> "Attempting to automatically update"
     const info = getInstallationInfo(projectRoot, true);
     expect(info.packageManager).toBe(PackageManager.PNPM);
     expect(info.isGlobal).toBe(true);
@@ -344,12 +343,15 @@ describe('getInstallationInfo', () => {
     const info = getInstallationInfo(projectRoot, true);
     expect(info.packageManager).toBe(PackageManager.NPM);
     expect(info.isGlobal).toBe(true);
-    expect(info.updateCommand).toBe('npm install -g @google/gemini-cli@latest');
-    expect(info.updateMessage).toContain('Attempting to automatically update');
+    expect(info.updateCommand).toBeUndefined();
+    expect(info.updateMessage).toBe(
+      'Rebuild the local fork, then restart to update.',
+    );
 
-    // isAutoUpdateEnabled = false -> "Please run..."
     const infoDisabled = getInstallationInfo(projectRoot, false);
-    expect(infoDisabled.updateMessage).toContain('Please run npm install');
+    expect(infoDisabled.updateMessage).toBe(
+      'Rebuild the local fork, then restart to update.',
+    );
   });
 
   it('should detect Volta installation (Unix-style)', () => {

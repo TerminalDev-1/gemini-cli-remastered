@@ -74,8 +74,6 @@ export interface UIActions {
   setQueueErrorMessage: (message: string | null) => void;
   addMessage: (message: string) => void;
   popAllMessages: () => string | undefined;
-  handleApiKeySubmit: (apiKey: string) => Promise<void>;
-  handleApiKeyCancel: () => void;
   setBannerVisible: (visible: boolean) => void;
   setShortcutsHelpVisible: (visible: boolean) => void;
   setCleanUiDetailsVisible: (visible: boolean) => void;
@@ -97,6 +95,8 @@ export interface UIActions {
   getPreferredEditor: () => EditorType | undefined;
   clearAccountSuspension: () => void;
   setVoiceModeEnabled: (value: boolean) => void;
+  dismissUpdateInfo: () => void;
+  dismissWhatsChanged: () => void;
 }
 
 export const UIActionsContext = createContext<UIActions | null>(null);

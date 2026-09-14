@@ -723,14 +723,6 @@ export async function start_sandbox(
       );
     }
 
-    // copy GEMINI_API_KEY(s)
-    if (process.env['GEMINI_API_KEY']) {
-      args.push('--env', `GEMINI_API_KEY=${process.env['GEMINI_API_KEY']}`);
-    }
-    if (process.env['GOOGLE_API_KEY']) {
-      args.push('--env', `GOOGLE_API_KEY=${process.env['GOOGLE_API_KEY']}`);
-    }
-
     // copy GOOGLE_GEMINI_BASE_URL and GOOGLE_VERTEX_BASE_URL
     if (process.env['GOOGLE_GEMINI_BASE_URL']) {
       args.push(
@@ -1195,8 +1187,6 @@ async function start_lxc_sandbox(
     // Build the environment variable arguments for `lxc exec`.
     const envArgs: string[] = [];
     const envVarsToForward: Record<string, string | undefined> = {
-      GEMINI_API_KEY: process.env['GEMINI_API_KEY'],
-      GOOGLE_API_KEY: process.env['GOOGLE_API_KEY'],
       GOOGLE_GEMINI_BASE_URL: process.env['GOOGLE_GEMINI_BASE_URL'],
       GOOGLE_VERTEX_BASE_URL: process.env['GOOGLE_VERTEX_BASE_URL'],
       GOOGLE_GENAI_USE_VERTEXAI: process.env['GOOGLE_GENAI_USE_VERTEXAI'],

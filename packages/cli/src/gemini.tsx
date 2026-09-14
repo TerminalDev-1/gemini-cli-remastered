@@ -479,21 +479,13 @@ export async function main() {
     validateDnsResolutionOrder(settings.merged.advanced.dnsResolutionOrder),
   );
 
-  // Set a default auth type if one isn't set or is set to a legacy type
-  if (
-    !settings.merged.security.auth.selectedType ||
-    settings.merged.security.auth.selectedType === AuthType.LEGACY_CLOUD_SHELL
-  ) {
-    if (
-      process.env['CLOUD_SHELL'] === 'true' ||
-      process.env['GEMINI_CLI_USE_COMPUTE_ADC'] === 'true'
-    ) {
-      settings.setValue(
-        SettingScope.User,
-        'security.auth.selectedType',
-        AuthType.COMPUTE_ADC,
-      );
-    }
+  // This private fork has one backend. Migrate legacy auth selections silently.
+  if (settings.merged.security.auth.selectedType !== AuthType.AGY) {
+    settings.setValue(
+      SettingScope.User,
+      'security.auth.selectedType',
+      AuthType.AGY,
+    );
   }
 
   const partialConfig = await loadCliConfig(settings.merged, sessionId, argv, {

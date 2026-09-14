@@ -12,6 +12,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 let versionPromise: Promise<string> | undefined;
+export const VERSION_LABEL = 'RR-release-preview';
 
 export function getVersion(): Promise<string> {
   if (versionPromise) {
@@ -19,7 +20,8 @@ export function getVersion(): Promise<string> {
   }
   versionPromise = (async () => {
     const pkgJson = await getPackageJson(__dirname);
-    return process.env['CLI_VERSION'] || pkgJson?.version || 'unknown';
+    const build = process.env['CLI_VERSION'] || pkgJson?.version || 'unknown';
+    return `${build} ${VERSION_LABEL}`;
   })();
   return versionPromise;
 }

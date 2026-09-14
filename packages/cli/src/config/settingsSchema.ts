@@ -2134,17 +2134,12 @@ const SETTINGS_SCHEMA = {
             label: 'Voice Transcription Backend',
             category: 'Experimental',
             requiresRestart: false,
-            default: 'gemini-live',
+            default: 'whisper',
             description: oneLine`
-              The backend to use for voice transcription. Note: When using the
-              Gemini Live backend, voice recordings are sent to Google Cloud for
-              transcription.
+              Voice transcription runs locally through Whisper in this build.
             `,
             showInDialog: true,
-            options: [
-              { value: 'gemini-live', label: 'Gemini Live API (Cloud)' },
-              { value: 'whisper', label: 'Whisper (Local)' },
-            ],
+            options: [{ value: 'whisper', label: 'Whisper (Local)' }],
           },
           whisperModel: {
             type: 'enum',

@@ -30,7 +30,7 @@ import {
   ASK_USER_TOOL_NAME,
   getVersion,
   coreEvents,
-  GEMINI_MODEL_ALIAS_AUTO,
+  DEFAULT_AGY_MODEL,
   getAdminErrorMessage,
   isHeadlessMode,
   Config,
@@ -839,7 +839,7 @@ export async function loadCliConfig(
     interactive,
   );
 
-  const defaultModel = GEMINI_MODEL_ALIAS_AUTO;
+  const defaultModel = DEFAULT_AGY_MODEL;
   const rawModel =
     argv.model || process.env['GEMINI_MODEL'] || settings.model?.name;
 
@@ -851,9 +851,7 @@ export async function loadCliConfig(
       : String(rawModel ?? '').trim() || '';
 
   const resolvedModel =
-    specifiedModel === GEMINI_MODEL_ALIAS_AUTO
-      ? defaultModel
-      : specifiedModel || defaultModel;
+    specifiedModel === 'auto' ? defaultModel : specifiedModel || defaultModel;
   const sandboxConfig = await loadSandboxConfig(settings, argv);
   if (sandboxConfig) {
     const existingPaths = sandboxConfig.allowedPaths || [];

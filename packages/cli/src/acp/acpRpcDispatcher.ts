@@ -7,7 +7,6 @@
 import {
   type AgentLoopContext,
   AuthType,
-  clearCachedCredentialFile,
   getVersion,
 } from '@google/gemini-cli-core';
 import * as acp from '@agentclientprotocol/sdk';
@@ -16,12 +15,8 @@ import { SettingScope, type LoadedSettings } from '../config/settings.js';
 import type { CliArgs } from '../config/config.js';
 import { getAcpErrorMessage } from './acpErrors.js';
 import { AcpSessionManager, type AuthDetails } from './acpSessionManager.js';
-import { hasMeta } from './acpUtils.js';
 
 export class GeminiAgent {
-  private apiKey: string | undefined;
-  private baseUrl: string | undefined;
-  private customHeaders: Record<string, string> | undefined;
   private sessionManager: AcpSessionManager;
 
   constructor(
@@ -46,35 +41,9 @@ export class GeminiAgent {
 
     const authMethods = [
       {
-        id: AuthType.LOGIN_WITH_GOOGLE,
-        name: 'Log in with Google',
-        description: 'Log in with your Google account',
-      },
-      {
-        id: AuthType.USE_GEMINI,
-        name: 'Gemini API key',
-        description: 'Use an API key with Gemini Developer API',
-        _meta: {
-          'api-key': {
-            provider: 'google',
-          },
-        },
-      },
-      {
-        id: AuthType.USE_VERTEX_AI,
-        name: 'Vertex AI',
-        description: 'Use an API key with Vertex AI GenAI API',
-      },
-      {
-        id: AuthType.GATEWAY,
-        name: 'AI API Gateway',
-        description: 'Use a custom AI API Gateway',
-        _meta: {
-          gateway: {
-            protocol: 'google',
-            restartRequired: 'false',
-          },
-        },
+        id: AuthType.AGY,
+        name: 'Authenticated with AGY',
+        description: 'Use the local Antigravity CLI session',
       },
     ];
 
@@ -105,57 +74,9 @@ export class GeminiAgent {
 
   async authenticate(req: acp.AuthenticateRequest): Promise<void> {
     const { methodId } = req;
-    const method = z.nativeEnum(AuthType).parse(methodId);
-    const selectedAuthType = this.settings.merged.security.auth.selectedType;
-
-    // Only clear credentials when switching to a different auth method
-    if (selectedAuthType && selectedAuthType !== method) {
-      await clearCachedCredentialFile();
-    }
-    // Check for api-key in _meta
-    const meta = hasMeta(req) ? req._meta : undefined;
-    const apiKey =
-      typeof meta?.['api-key'] === 'string' ? meta['api-key'] : undefined;
-
-    // Refresh auth with the requested method
-    // This will reuse existing credentials if they're valid,
-    // or perform new authentication if needed
+    const method = z.literal(AuthType.AGY).parse(methodId);
     try {
-      if (apiKey) {
-        this.apiKey = apiKey;
-      }
-
-      // Extract gateway details if present
-      const gatewaySchema = z.object({
-        baseUrl: z.string().optional(),
-        headers: z.record(z.string()).optional(),
-      });
-
-      let baseUrl: string | undefined;
-      let headers: Record<string, string> | undefined;
-
-      if (meta?.['gateway']) {
-        const result = gatewaySchema.safeParse(meta['gateway']);
-        if (result.success) {
-          baseUrl = result.data.baseUrl;
-          headers = result.data.headers;
-        } else {
-          throw new acp.RequestError(
-            -32602,
-            `Malformed gateway payload: ${result.error.message}`,
-          );
-        }
-      }
-
-      this.baseUrl = baseUrl;
-      this.customHeaders = headers;
-
-      await this.context.config.refreshAuth(
-        method,
-        apiKey ?? this.apiKey,
-        baseUrl,
-        headers,
-      );
+      await this.context.config.refreshAuth(method);
     } catch (e) {
       throw new acp.RequestError(-32000, getAcpErrorMessage(e));
     }
@@ -167,11 +88,7 @@ export class GeminiAgent {
   }
 
   private getAuthDetails(): AuthDetails {
-    return {
-      apiKey: this.apiKey,
-      baseUrl: this.baseUrl,
-      customHeaders: this.customHeaders,
-    };
+    return {};
   }
 
   async newSession(

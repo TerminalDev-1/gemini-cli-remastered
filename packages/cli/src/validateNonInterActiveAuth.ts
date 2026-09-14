@@ -18,34 +18,25 @@ import { handleError } from './utils/errors.js';
 import { runExitCleanup } from './utils/cleanup.js';
 
 export async function validateNonInteractiveAuth(
-  configuredAuthType: AuthType | undefined,
-  useExternalAuth: boolean | undefined,
+  _configuredAuthType: AuthType | undefined,
+  _useExternalAuth: boolean | undefined,
   nonInteractiveConfig: Config,
-  settings: LoadedSettings,
+  _settings: LoadedSettings,
 ) {
   try {
-    const effectiveAuthType = configuredAuthType || getAuthTypeFromEnv();
-
-    const enforcedType = settings.merged.security.auth.enforcedType;
-    if (enforcedType && effectiveAuthType !== enforcedType) {
-      const message = effectiveAuthType
-        ? `The enforced authentication type is '${enforcedType}', but the current type is '${effectiveAuthType}'. Please re-authenticate with the correct type.`
-        : `The auth type '${enforcedType}' is enforced, but no authentication is configured.`;
-      throw new Error(message);
-    }
+    const effectiveAuthType = getAuthTypeFromEnv();
 
     if (!effectiveAuthType) {
-      const message = `Please set an Auth method in your ${USER_SETTINGS_PATH} or specify one of the following environment variables before running: GEMINI_API_KEY, GOOGLE_GENAI_USE_VERTEXAI, GOOGLE_GENAI_USE_GCA`;
-      throw new Error(message);
+      throw new Error(
+        `Set Antigravity CLI authentication in ${USER_SETTINGS_PATH} before running.`,
+      );
     }
 
     const authType: AuthType = effectiveAuthType;
 
-    if (!useExternalAuth) {
-      const err = await validateAuthMethod(String(authType));
-      if (err != null) {
-        throw new Error(err);
-      }
+    const err = await validateAuthMethod(String(authType));
+    if (err != null) {
+      throw new Error(err);
     }
 
     return authType;

@@ -36,6 +36,7 @@ export * from './commands/types.js';
 export * from './core/baseLlmClient.js';
 export * from './core/client.js';
 export * from './core/contentGenerator.js';
+export * from './core/agyContentGenerator.js';
 export * from './core/fakeContentGenerator.js';
 export * from './core/loggingContentGenerator.js';
 export * from './core/geminiChat.js';
@@ -65,7 +66,6 @@ export * from './code_assist/types.js';
 export * from './code_assist/telemetry.js';
 export * from './code_assist/admin/admin_controls.js';
 export * from './code_assist/admin/mcpUtils.js';
-export * from './core/apiKeyCredentialStorage.js';
 
 // Export utilities
 export * from './utils/fetch.js';

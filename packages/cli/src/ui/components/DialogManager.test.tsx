@@ -38,9 +38,6 @@ vi.mock('../auth/AuthInProgress.js', () => ({
 vi.mock('../auth/AuthDialog.js', () => ({
   AuthDialog: () => <Text>AuthDialog</Text>,
 }));
-vi.mock('../auth/ApiAuthDialog.js', () => ({
-  ApiAuthDialog: () => <Text>ApiAuthDialog</Text>,
-}));
 vi.mock('./EditorSettingsDialog.js', () => ({
   EditorSettingsDialog: () => <Text>EditorSettingsDialog</Text>,
 }));
@@ -85,7 +82,6 @@ describe('DialogManager', () => {
     isSettingsDialogOpen: false,
     isModelDialogOpen: false,
     isAuthenticating: false,
-    isAwaitingApiKeyInput: false,
     isAuthDialogOpen: false,
     isEditorDialogOpen: false,
     showPrivacyNotice: false,
@@ -94,6 +90,7 @@ describe('DialogManager', () => {
     selectedAgentName: undefined,
     selectedAgentDisplayName: undefined,
     selectedAgentDefinition: undefined,
+    updateInfo: null,
   };
 
   it('renders nothing by default', async () => {
@@ -106,6 +103,25 @@ describe('DialogManager', () => {
   });
 
   const testCases: Array<[Partial<UIState>, string, Partial<QuotaState>?]> = [
+    [
+      {
+        updateInfo: {
+          message: 'Local build changed.',
+          update: { latest: '1', current: '1', name: 'local' },
+          changedFiles: ['packages/core/src/core/agyContentGenerator.ts'],
+        },
+      },
+      'A new update has been found.',
+    ],
+    [
+      {
+        whatsChanged: {
+          changedFiles: ['notes.txt'],
+          descriptions: ['Updated project documentation or text content.'],
+        },
+      },
+      "What's New",
+    ],
     [
       {
         showIdeRestartPrompt: true,
@@ -156,7 +172,6 @@ describe('DialogManager', () => {
     [{ isSettingsDialogOpen: true }, 'SettingsDialog'],
     [{ isModelDialogOpen: true }, 'ModelDialog'],
     [{ isAuthenticating: true }, 'AuthInProgress'],
-    [{ isAwaitingApiKeyInput: true }, 'ApiAuthDialog'],
     [{ isAuthDialogOpen: true }, 'AuthDialog'],
     [{ isEditorDialogOpen: true }, 'EditorSettingsDialog'],
     [{ showPrivacyNotice: true }, 'PrivacyNotice'],

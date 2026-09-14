@@ -192,6 +192,9 @@ import { CheckerRegistry } from '../safety/registry.js';
 import { ConsecaSafetyChecker } from '../safety/conseca/conseca.js';
 import type { AgentLoopContext } from './agent-loop-context.js';
 
+/** Reasoning effort accepted by the local Antigravity CLI backend. */
+export type ReasoningEffort = 'low' | 'medium' | 'high';
+
 export interface AccessibilitySettings {
   /** @deprecated Use ui.statusHints instead. */
   enableLoadingPhrases?: boolean;
@@ -641,6 +644,7 @@ export interface ConfigParameters {
   includeDirectories?: string[];
   bugCommand?: BugCommandSettings;
   model: string;
+  reasoningEffort?: ReasoningEffort;
   disableLoopDetection?: boolean;
   maxSessionTurns?: number;
   acpMode?: boolean;
@@ -830,6 +834,7 @@ export class Config implements McpContext, AgentLoopContext {
   private readonly cwd: string;
   private readonly bugCommand: BugCommandSettings | undefined;
   private model: string;
+  private reasoningEffort: ReasoningEffort | undefined;
   private readonly disableLoopDetection: boolean;
   // null = unknown (quota not fetched); true = has access; false = definitively no access
   private hasAccessToPreviewModel: boolean | null = null;
@@ -1127,6 +1132,7 @@ export class Config implements McpContext, AgentLoopContext {
     this.fileDiscoveryService = params.fileDiscoveryService ?? null;
     this.bugCommand = params.bugCommand;
     this.model = params.model;
+    this.reasoningEffort = params.reasoningEffort;
     this.disableLoopDetection = params.disableLoopDetection ?? false;
     this._activeModel = params.model;
     this.enableAgents = params.enableAgents ?? true;
@@ -1614,6 +1620,18 @@ export class Config implements McpContext, AgentLoopContext {
     // Only assign to instance properties after successful initialization
     this.contentGeneratorConfig = newContentGeneratorConfig;
 
+    // AGY is the complete backend for this fork. Do not contact Gemini Code
+    // Assist for experiments, quota, preview access, or admin controls.
+    if (authMethod === AuthType.AGY) {
+      this.experimentsPromise = Promise.resolve(undefined);
+      const requestTimeoutMs = this.getRequestTimeoutMs();
+      if (requestTimeoutMs !== undefined) {
+        updateGlobalFetchTimeouts(requestTimeoutMs);
+      }
+      this.baseLlmClient = new BaseLlmClient(this.contentGenerator, this);
+      return;
+    }
+
     const codeAssistServer = getCodeAssistServer(this);
     const quotaPromise = codeAssistServer?.projectId
       ? this.refreshUserQuota()
@@ -1918,6 +1936,16 @@ export class Config implements McpContext, AgentLoopContext {
 
   getModel(): string {
     return this.model;
+  }
+
+  /** Returns the session-level AGY reasoning override, if one is set. */
+  getReasoningEffort(): ReasoningEffort | undefined {
+    return this.reasoningEffort;
+  }
+
+  /** Sets a session-level AGY reasoning override independent of model name. */
+  setReasoningEffort(effort: ReasoningEffort | undefined): void {
+    this.reasoningEffort = effort;
   }
 
   getDisableLoopDetection(): boolean {

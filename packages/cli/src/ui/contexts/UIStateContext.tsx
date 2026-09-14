@@ -32,7 +32,7 @@ import { type TransientMessageType } from '../../utils/events.js';
 import type { DOMElement } from 'ink';
 import type { SessionStatsState } from '../contexts/SessionContext.js';
 import type { ExtensionUpdateState } from '../state/extensions.js';
-import type { UpdateObject } from '../utils/updateCheck.js';
+import type { LocalChangeSummary, UpdateObject } from '../utils/updateCheck.js';
 
 export interface ProQuotaDialogRequest {
   failedModel: string;
@@ -101,10 +101,8 @@ export interface UIState {
   authError: string | null;
   accountSuspensionInfo: AccountSuspensionInfo | null;
   isAuthDialogOpen: boolean;
-  isAwaitingApiKeyInput: boolean;
   isAwaitingLoginRestart: boolean;
   loginRestartMessage?: string;
-  apiKeyDefaultValue?: string;
   editorError: string | null;
   isEditorDialogOpen: boolean;
   showPrivacyNotice: boolean;
@@ -182,6 +180,7 @@ export interface UIState {
   rootUiRef: React.MutableRefObject<DOMElement | null>;
   currentIDE: IdeInfo | null;
   updateInfo: UpdateObject | null;
+  whatsChanged: LocalChangeSummary | null;
   showIdeRestartPrompt: boolean;
   ideTrustRestartReason: RestartReason;
   isRestarting: boolean;

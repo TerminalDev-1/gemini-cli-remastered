@@ -7,9 +7,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import type { LoadedSettings } from '../../config/settings.js';
 import {
-  AuthType,
+  type AuthType,
   type Config,
-  loadApiKey,
   debugLogger,
   isAccountSuspendedError,
   ProjectIdRequiredError,
@@ -20,19 +19,8 @@ import { validateAuthMethod } from '../../config/auth.js';
 
 export async function validateAuthMethodWithSettings(
   authType: AuthType,
-  settings: LoadedSettings,
+  _settings: LoadedSettings,
 ): Promise<string | null> {
-  const enforcedType = settings.merged.security.auth.enforcedType;
-  if (enforcedType && enforcedType !== authType) {
-    return `Authentication is enforced to be ${enforcedType}, but you are currently using ${authType}.`;
-  }
-  if (settings.merged.security.auth.useExternal) {
-    return null;
-  }
-  // If using Gemini API key, we don't validate it here as we might need to prompt for it.
-  if (authType === AuthType.USE_GEMINI) {
-    return null;
-  }
   return validateAuthMethod(authType);
 }
 
@@ -51,10 +39,6 @@ export const useAuthCommand = (
   const [authError, setAuthError] = useState<string | null>(initialAuthError);
   const [accountSuspensionInfo, setAccountSuspensionInfo] =
     useState<AccountSuspensionInfo | null>(initialAccountSuspensionInfo);
-  const [apiKeyDefaultValue, setApiKeyDefaultValue] = useState<
-    string | undefined
-  >(undefined);
-
   const onAuthError = useCallback(
     (error: string | null) => {
       setAuthError(error);
@@ -65,25 +49,6 @@ export const useAuthCommand = (
     [setAuthError, setAuthState],
   );
 
-  const reloadApiKey = useCallback(async () => {
-    const envKey = process.env['GEMINI_API_KEY'];
-    if (envKey !== undefined) {
-      setApiKeyDefaultValue(envKey);
-      return envKey;
-    }
-
-    const storedKey = (await loadApiKey()) ?? '';
-    setApiKeyDefaultValue(storedKey);
-    return storedKey;
-  }, []);
-
-  useEffect(() => {
-    if (authState === AuthState.AwaitingApiKeyInput) {
-      // eslint-disable-next-line @typescript-eslint/no-floating-promises
-      reloadApiKey();
-    }
-  }, [authState, reloadApiKey]);
-
   useEffect(() => {
     // eslint-disable-next-line @typescript-eslint/no-floating-promises
     (async () => {
@@ -93,22 +58,8 @@ export const useAuthCommand = (
 
       const authType = settings.merged.security.auth.selectedType;
       if (!authType) {
-        if (process.env['GEMINI_API_KEY']) {
-          onAuthError(
-            'Existing API key detected (GEMINI_API_KEY). Select "Gemini API Key" option to use it.',
-          );
-        } else {
-          onAuthError('No authentication method selected.');
-        }
+        onAuthError('Antigravity CLI authentication is not selected.');
         return;
-      }
-
-      if (authType === AuthType.USE_GEMINI) {
-        const key = await reloadApiKey(); // Use the unified function
-        if (!key) {
-          setAuthState(AuthState.AwaitingApiKeyInput);
-          return;
-        }
       }
 
       const error = await validateAuthMethodWithSettings(
@@ -118,19 +69,6 @@ export const useAuthCommand = (
 
       if (error) {
         onAuthError(error);
-        return;
-      }
-
-      const defaultAuthType = process.env['GEMINI_DEFAULT_AUTH_TYPE'];
-      if (
-        defaultAuthType &&
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-        !Object.values(AuthType).includes(defaultAuthType as AuthType)
-      ) {
-        onAuthError(
-          `Invalid value for GEMINI_DEFAULT_AUTH_TYPE: "${defaultAuthType}". ` +
-            `Valid values are: ${Object.values(AuthType).join(', ')}.`,
-        );
         return;
       }
 
@@ -157,23 +95,13 @@ export const useAuthCommand = (
         }
       }
     })();
-  }, [
-    settings,
-    config,
-    authState,
-    setAuthState,
-    setAuthError,
-    onAuthError,
-    reloadApiKey,
-  ]);
+  }, [settings, config, authState, setAuthState, setAuthError, onAuthError]);
 
   return {
     authState,
     setAuthState,
     authError,
     onAuthError,
-    apiKeyDefaultValue,
-    reloadApiKey,
     accountSuspensionInfo,
     setAccountSuspensionInfo,
   };

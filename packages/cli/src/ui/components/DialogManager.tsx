@@ -14,7 +14,6 @@ import { SettingsDialog } from './SettingsDialog.js';
 import { AuthInProgress } from '../auth/AuthInProgress.js';
 import { AuthDialog } from '../auth/AuthDialog.js';
 import { BannedAccountDialog } from '../auth/BannedAccountDialog.js';
-import { ApiAuthDialog } from '../auth/ApiAuthDialog.js';
 import { EditorSettingsDialog } from './EditorSettingsDialog.js';
 import { PrivacyNotice } from '../privacy/PrivacyNotice.js';
 import { ProQuotaDialog } from './ProQuotaDialog.js';
@@ -40,6 +39,8 @@ import { NewAgentsNotification } from './NewAgentsNotification.js';
 import { AgentConfigDialog } from './AgentConfigDialog.js';
 import { PolicyUpdateDialog } from './PolicyUpdateDialog.js';
 import { LoginRestartDialog } from '../auth/LoginRestartDialog.js';
+import { WhatsNewDialog } from './WhatsNewDialog.js';
+import { UpdateDialog } from './UpdateDialog.js';
 
 interface DialogManagerProps {
   addItem: UseHistoryManagerReturn['addItem'];
@@ -66,6 +67,23 @@ export const DialogManager = ({
 
   if (uiState.adminSettingsChanged) {
     return <AdminSettingsChangedDialog />;
+  }
+  if (uiState.updateInfo) {
+    return (
+      <UpdateDialog
+        onRestart={uiActions.handleRestart}
+        onContinue={uiActions.dismissUpdateInfo}
+        changedFiles={uiState.updateInfo.changedFiles}
+      />
+    );
+  }
+  if (uiState.whatsChanged) {
+    return (
+      <WhatsNewDialog
+        summary={uiState.whatsChanged}
+        onDismiss={uiActions.dismissWhatsChanged}
+      />
+    );
   }
   if (uiState.showIdeRestartPrompt) {
     return <IdeTrustChangeDialog reason={uiState.ideTrustRestartReason} />;
@@ -294,20 +312,6 @@ export const DialogManager = ({
       />
     );
   }
-  if (uiState.isAwaitingApiKeyInput) {
-    return (
-      <Box flexDirection="column">
-        <ApiAuthDialog
-          key={uiState.apiKeyDefaultValue}
-          onSubmit={uiActions.handleApiKeySubmit}
-          onCancel={uiActions.handleApiKeyCancel}
-          error={uiState.authError}
-          defaultValue={uiState.apiKeyDefaultValue}
-        />
-      </Box>
-    );
-  }
-
   if (uiState.isAwaitingLoginRestart) {
     return (
       <Box flexDirection="column">

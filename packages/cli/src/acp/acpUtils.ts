@@ -10,19 +10,9 @@ import {
   type ToolCallConfirmationDetails,
   Kind,
   ApprovalMode,
-  GEMINI_MODEL_ALIAS_AUTO,
-  DEFAULT_GEMINI_MODEL,
-  DEFAULT_GEMINI_FLASH_MODEL,
-  DEFAULT_GEMINI_FLASH_LITE_MODEL,
-  PREVIEW_GEMINI_3_1_MODEL,
-  PREVIEW_GEMINI_MODEL,
-  PREVIEW_GEMINI_3_1_CUSTOM_TOOLS_MODEL,
-  PREVIEW_GEMINI_FLASH_MODEL,
-  PREVIEW_GEMINI_FLASH_LITE_MODEL,
-  getDisplayString,
-  AuthType,
+  DEFAULT_AGY_MODEL,
+  listAgyModels,
   ToolConfirmationOutcome,
-  getAutoModelDescription,
 } from '@google/gemini-cli-core';
 import type * as acp from '@agentclientprotocol/sdk';
 import { z } from 'zod';
@@ -251,115 +241,23 @@ export function buildAvailableModes(isPlanEnabled: boolean): acp.SessionMode[] {
   return modes;
 }
 
-export function buildAvailableModels(
+export async function buildAvailableModels(
   config: Config,
-  settings: LoadedSettings,
-): {
+  _settings: LoadedSettings,
+): Promise<{
   availableModels: Array<{
     modelId: string;
     name: string;
     description?: string;
   }>;
   currentModelId: string;
-} {
-  const preferredModel = config.getModel() || GEMINI_MODEL_ALIAS_AUTO;
-  const shouldShowPreviewModels = config.getHasAccessToPreviewModel();
-  const useGemini31 = config.getGemini31LaunchedSync?.() ?? false;
-  const useGemini3_5Flash = config.hasGemini35FlashGAAccess?.() ?? false;
-  const selectedAuthType = settings.merged.security.auth.selectedType;
-  const useCustomToolModel =
-    useGemini31 && selectedAuthType === AuthType.USE_GEMINI;
-
-  // --- DYNAMIC PATH ---
-  if (
-    config.getExperimentalDynamicModelConfiguration?.() === true &&
-    config.getModelConfigService
-  ) {
-    const options = config.getModelConfigService().getAvailableModelOptions({
-      useGemini3_1: useGemini31,
-      useGemini3_5Flash,
-      useCustomTools: useCustomToolModel,
-      hasAccessToPreview: shouldShowPreviewModels,
-    });
-
-    return {
-      availableModels: options,
-      currentModelId: preferredModel,
-    };
-  }
-
-  // --- LEGACY PATH ---
-  const mainOptions = [
-    {
-      value: GEMINI_MODEL_ALIAS_AUTO,
-      title: getDisplayString(GEMINI_MODEL_ALIAS_AUTO),
-      description: getAutoModelDescription(
-        shouldShowPreviewModels,
-        useGemini31,
-        useGemini3_5Flash,
-      ),
-    },
-  ];
-
-  const manualOptions = [
-    {
-      value: DEFAULT_GEMINI_MODEL,
-      title: getDisplayString(DEFAULT_GEMINI_MODEL),
-    },
-    {
-      value: DEFAULT_GEMINI_FLASH_MODEL,
-      title: getDisplayString(DEFAULT_GEMINI_FLASH_MODEL),
-    },
-    {
-      value: DEFAULT_GEMINI_FLASH_LITE_MODEL,
-      title: getDisplayString(DEFAULT_GEMINI_FLASH_LITE_MODEL),
-    },
-  ];
-
-  if (shouldShowPreviewModels) {
-    const previewProModel = useGemini31
-      ? PREVIEW_GEMINI_3_1_MODEL
-      : PREVIEW_GEMINI_MODEL;
-
-    const previewProValue = useCustomToolModel
-      ? PREVIEW_GEMINI_3_1_CUSTOM_TOOLS_MODEL
-      : previewProModel;
-
-    const previewOptions = [
-      {
-        value: previewProValue,
-        title: getDisplayString(previewProModel),
-      },
-      {
-        value: PREVIEW_GEMINI_FLASH_MODEL,
-        title: getDisplayString(PREVIEW_GEMINI_FLASH_MODEL),
-      },
-    ];
-
-    if (PREVIEW_GEMINI_FLASH_LITE_MODEL !== 'none') {
-      previewOptions.push({
-        value: PREVIEW_GEMINI_FLASH_LITE_MODEL,
-        title: getDisplayString(PREVIEW_GEMINI_FLASH_LITE_MODEL),
-      });
-    }
-
-    manualOptions.unshift(...previewOptions);
-  }
-
-  const scaleOptions = (
-    options: Array<{ value: string; title: string; description?: string }>,
-  ) =>
-    options.map((o) => ({
-      modelId: o.value,
-      name: o.title,
-      description: o.description,
-    }));
-
+}> {
+  const models = await listAgyModels();
   return {
-    availableModels: [
-      ...scaleOptions(mainOptions),
-      ...scaleOptions(manualOptions),
-    ],
-    currentModelId: preferredModel,
+    availableModels: models.map((model) => ({
+      modelId: model.id,
+      name: model.name,
+    })),
+    currentModelId: config.getModel() || DEFAULT_AGY_MODEL,
   };
 }

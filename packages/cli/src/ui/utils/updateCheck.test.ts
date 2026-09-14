@@ -1,238 +1,152 @@
 /**
  * @license
- * Copyright 2025 Google LLC
+ * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { checkForUpdates } from './updateCheck.js';
+import { existsSync } from 'node:fs';
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
+import { afterEach, describe, expect, it } from 'vitest';
 import type { LoadedSettings } from '../../config/settings.js';
-
-const getPackageJson = vi.hoisted(() => vi.fn());
-const debugLogger = vi.hoisted(() => ({
-  warn: vi.fn(),
-}));
-vi.mock('@google/gemini-cli-core', () => ({
-  getPackageJson,
-  debugLogger,
-  ReleaseChannel: {
-    NIGHTLY: 'nightly',
-    PREVIEW: 'preview',
-    STABLE: 'stable',
-  },
-  getChannelFromVersion: (version: string) => {
-    if (!version || version.includes('nightly')) {
-      return 'nightly';
-    }
-    if (version.includes('preview')) {
-      return 'preview';
-    }
-    return 'stable';
-  },
-  RELEASE_CHANNEL_STABILITY: {
-    nightly: 0,
-    preview: 1,
-    stable: 2,
-  },
-}));
-
-const latestVersion = vi.hoisted(() => vi.fn());
-vi.mock('latest-version', () => ({
-  default: latestVersion,
-}));
+import { updateEventEmitter } from '../../utils/updateEventEmitter.js';
+import {
+  acknowledgePendingLocalChanges,
+  checkForUpdates,
+  loadPendingLocalChanges,
+  summarizeChangedFiles,
+  startLocalUpdateWatcher,
+  type UpdateObject,
+} from './updateCheck.js';
 
 describe('checkForUpdates', () => {
-  let mockSettings: LoadedSettings;
-
-  beforeEach(() => {
-    vi.useFakeTimers();
-    vi.resetAllMocks();
-    // Clear DEV environment variable before each test
-    delete process.env['DEV'];
-
-    mockSettings = {
-      merged: {
-        general: {
-          enableAutoUpdateNotification: true,
-        },
-      },
-    } as LoadedSettings;
-  });
-
   afterEach(() => {
-    vi.useRealTimers();
-    vi.restoreAllMocks();
+    delete process.env['GEMINI_CLI_BUILD_ROOT'];
+    delete process.env['GEMINI_CLI_UPDATE_STATE_PATH'];
   });
 
-  it('should return null if enableAutoUpdateNotification is false', async () => {
-    mockSettings.merged.general.enableAutoUpdateNotification = false;
-    const result = await checkForUpdates(mockSettings);
-    expect(result).toBeNull();
-    expect(getPackageJson).not.toHaveBeenCalled();
-    expect(latestVersion).not.toHaveBeenCalled();
+  it('never checks npm for updates', async () => {
+    await expect(checkForUpdates({} as LoadedSettings)).resolves.toBeNull();
   });
 
-  it('should return null when running from source (DEV=true)', async () => {
-    process.env['DEV'] = 'true';
-    getPackageJson.mockResolvedValue({
-      name: 'test-package',
-      version: '1.0.0',
+  it('asks for a restart when any local build file changes', async () => {
+    const root = await mkdtemp(path.join(tmpdir(), 'gemini-agy-watch-'));
+    process.env['GEMINI_CLI_BUILD_ROOT'] = root;
+    process.env['GEMINI_CLI_UPDATE_STATE_PATH'] = path.join(
+      root,
+      'pending.json',
+    );
+    const changed = new Promise<UpdateObject>((resolve) => {
+      updateEventEmitter.once('update-received', resolve);
     });
-    latestVersion.mockResolvedValue('1.1.0');
-    const result = await checkForUpdates(mockSettings);
-    expect(result).toBeNull();
-    expect(getPackageJson).not.toHaveBeenCalled();
-    expect(latestVersion).not.toHaveBeenCalled();
-  });
-
-  it('should return null if package.json is missing', async () => {
-    getPackageJson.mockResolvedValue(null);
-    const result = await checkForUpdates(mockSettings);
-    expect(result).toBeNull();
-  });
-
-  it('should return null if there is no update', async () => {
-    getPackageJson.mockResolvedValue({
-      name: 'test-package',
-      version: '1.0.0',
-    });
-    latestVersion.mockResolvedValue('1.0.0');
-    const result = await checkForUpdates(mockSettings);
-    expect(result).toBeNull();
-  });
-
-  it('should return a message if a newer version is available', async () => {
-    getPackageJson.mockResolvedValue({
-      name: 'test-package',
-      version: '1.0.0',
-    });
-    latestVersion.mockResolvedValue('1.1.0');
-
-    const result = await checkForUpdates(mockSettings);
-    expect(result?.message).toContain('1.0.0 → 1.1.0');
-    expect(result?.update.current).toEqual('1.0.0');
-    expect(result?.update.latest).toEqual('1.1.0');
-    expect(result?.update.name).toEqual('test-package');
-  });
-
-  it('should return null if the latest version is the same as the current version', async () => {
-    getPackageJson.mockResolvedValue({
-      name: 'test-package',
-      version: '1.0.0',
-    });
-    latestVersion.mockResolvedValue('1.0.0');
-    const result = await checkForUpdates(mockSettings);
-    expect(result).toBeNull();
-  });
-
-  it('should return null if the latest version is older than the current version', async () => {
-    getPackageJson.mockResolvedValue({
-      name: 'test-package',
-      version: '1.1.0',
-    });
-    latestVersion.mockResolvedValue('1.0.0');
-    const result = await checkForUpdates(mockSettings);
-    expect(result).toBeNull();
-  });
-
-  it('should return null if latestVersion rejects', async () => {
-    getPackageJson.mockResolvedValue({
-      name: 'test-package',
-      version: '1.0.0',
-    });
-    latestVersion.mockRejectedValue(new Error('Timeout'));
-
-    const result = await checkForUpdates(mockSettings);
-    expect(result).toBeNull();
-  });
-
-  it('should handle errors gracefully', async () => {
-    getPackageJson.mockRejectedValue(new Error('test error'));
-    const result = await checkForUpdates(mockSettings);
-    expect(result).toBeNull();
-  });
-
-  describe('nightly updates', () => {
-    it('should notify for a newer nightly version when current is nightly', async () => {
-      getPackageJson.mockResolvedValue({
-        name: 'test-package',
-        version: '1.2.3-nightly.1',
+    const stop = startLocalUpdateWatcher();
+    try {
+      await writeFile(path.join(root, 'system-prompt.txt'), 'changed');
+      const update = await changed;
+      expect(update.message).toBe('A new update has been found.');
+      expect(update.update.name).toBe('Gemini CLI AGY Adapter');
+      await expect(loadPendingLocalChanges()).resolves.toMatchObject({
+        changedFiles: ['system-prompt.txt'],
+        descriptions: ['Updated project documentation or text content.'],
       });
-
-      latestVersion.mockImplementation(async (name, options) => {
-        if (options?.version === 'nightly') {
-          return '1.2.3-nightly.2';
-        }
-        return '1.2.3';
-      });
-
-      const result = await checkForUpdates(mockSettings);
-      expect(result?.message).toContain('1.2.3-nightly.1 → 1.2.3-nightly.2');
-      expect(result?.update.latest).toBe('1.2.3-nightly.2');
-    });
+    } finally {
+      stop();
+      await acknowledgePendingLocalChanges();
+      await rm(root, { recursive: true, force: true });
+    }
   });
 
-  describe('channel stability', () => {
-    it('should NOT offer nightly update to a stable user even if tagged as latest', async () => {
-      getPackageJson.mockResolvedValue({
-        name: 'test-package',
-        version: '1.0.0',
+  it('ignores generated trees and reports concrete UI changes', async () => {
+    const root = await mkdtemp(path.join(tmpdir(), 'gemini-agy-watch-'));
+    process.env['GEMINI_CLI_BUILD_ROOT'] = root;
+    process.env['GEMINI_CLI_UPDATE_STATE_PATH'] = path.join(
+      root,
+      'pending.json',
+    );
+    await mkdir(path.join(root, 'dist'), { recursive: true });
+    await mkdir(path.join(root, 'src', 'ui'), { recursive: true });
+    await writeFile(path.join(root, 'dist', 'bundle.js'), 'initial');
+    await writeFile(
+      path.join(root, 'src', 'ui', 'AppContainer.tsx'),
+      'initial',
+    );
+
+    const updates: UpdateObject[] = [];
+    const listener = (update: UpdateObject) => updates.push(update);
+    updateEventEmitter.on('update-received', listener);
+    const stop = startLocalUpdateWatcher();
+    try {
+      await writeFile(path.join(root, 'dist', 'bundle.js'), 'generated');
+      await new Promise((resolve) => setTimeout(resolve, 450));
+      expect(updates).toHaveLength(0);
+
+      await writeFile(
+        path.join(root, 'src', 'ui', 'AppContainer.tsx'),
+        'changed',
+      );
+      await new Promise((resolve) => setTimeout(resolve, 450));
+      expect(updates).toHaveLength(1);
+      await expect(loadPendingLocalChanges()).resolves.toMatchObject({
+        descriptions: ['Updated the terminal interface.'],
       });
-      // latest points to a nightly that is semver-greater
-      latestVersion.mockResolvedValue('1.1.0-nightly.1');
+    } finally {
+      updateEventEmitter.off('update-received', listener);
+      stop();
+      await acknowledgePendingLocalChanges();
+      await rm(root, { recursive: true, force: true });
+    }
+  });
 
-      const result = await checkForUpdates(mockSettings);
-      expect(result).toBeNull();
-    });
-
-    it('should NOT offer preview update to a stable user even if tagged as latest', async () => {
-      getPackageJson.mockResolvedValue({
-        name: 'test-package',
-        version: '1.0.0',
+  it('emits one prompt while merging later changes into the pending summary', async () => {
+    const root = await mkdtemp(path.join(tmpdir(), 'gemini-agy-watch-'));
+    process.env['GEMINI_CLI_BUILD_ROOT'] = root;
+    process.env['GEMINI_CLI_UPDATE_STATE_PATH'] = path.join(
+      root,
+      'pending.json',
+    );
+    const updates: UpdateObject[] = [];
+    const listener = (update: UpdateObject) => updates.push(update);
+    updateEventEmitter.on('update-received', listener);
+    const stop = startLocalUpdateWatcher();
+    try {
+      await writeFile(path.join(root, 'first.ts'), 'one');
+      await new Promise((resolve) => setTimeout(resolve, 450));
+      await writeFile(path.join(root, 'second.ts'), 'two');
+      await new Promise((resolve) => setTimeout(resolve, 450));
+      expect(updates).toHaveLength(1);
+      await expect(loadPendingLocalChanges()).resolves.toMatchObject({
+        changedFiles: ['first.ts', 'second.ts'],
       });
-      // latest points to a preview that is semver-greater
-      latestVersion.mockResolvedValue('1.1.0-preview.1');
+    } finally {
+      updateEventEmitter.off('update-received', listener);
+      stop();
+      await acknowledgePendingLocalChanges();
+      await rm(root, { recursive: true, force: true });
+    }
+  });
 
-      const result = await checkForUpdates(mockSettings);
-      expect(result).toBeNull();
-    });
+  it('drops legacy pending state instead of replaying it forever', async () => {
+    const root = await mkdtemp(path.join(tmpdir(), 'gemini-agy-pending-'));
+    const pendingPath = path.join(root, 'pending.json');
+    process.env['GEMINI_CLI_BUILD_ROOT'] = root;
+    process.env['GEMINI_CLI_UPDATE_STATE_PATH'] = pendingPath;
+    await writeFile(
+      pendingPath,
+      JSON.stringify({ changedFiles: ['unknown file'] }),
+    );
+    try {
+      await expect(loadPendingLocalChanges()).resolves.toBeNull();
+      expect(existsSync(pendingPath)).toBe(false);
+    } finally {
+      await acknowledgePendingLocalChanges();
+      await rm(root, { recursive: true, force: true });
+    }
+  });
 
-    it('should offer stable update to a stable user', async () => {
-      getPackageJson.mockResolvedValue({
-        name: 'test-package',
-        version: '1.0.0',
-      });
-      latestVersion.mockResolvedValue('1.1.0');
-
-      const result = await checkForUpdates(mockSettings);
-      expect(result?.update.latest).toBe('1.1.0');
-    });
-
-    it('should offer stable update to a nightly user', async () => {
-      getPackageJson.mockResolvedValue({
-        name: 'test-package',
-        version: '1.0.0-nightly.1',
-      });
-      latestVersion.mockImplementation(async (name, options) => {
-        if (options?.version === 'nightly') {
-          return '1.0.0-nightly.1'; // No nightly update
-        }
-        return '1.1.0'; // Stable update available
-      });
-
-      const result = await checkForUpdates(mockSettings);
-      expect(result?.update.latest).toBe('1.1.0');
-    });
-
-    it('should offer stable update to a preview user', async () => {
-      getPackageJson.mockResolvedValue({
-        name: 'test-package',
-        version: '1.0.0-preview.1',
-      });
-      latestVersion.mockResolvedValue('1.1.0');
-
-      const result = await checkForUpdates(mockSettings);
-      expect(result?.update.latest).toBe('1.1.0');
-    });
+  it('does not use the old generic application-behavior label', () => {
+    expect(summarizeChangedFiles(['src/unknown.ts'])).toEqual([
+      'Updated application code.',
+    ]);
   });
 });

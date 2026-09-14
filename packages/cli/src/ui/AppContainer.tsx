@@ -61,18 +61,15 @@ import {
   getErrorMessage,
   getAllGeminiMdFilenames,
   AuthType,
-  clearCachedCredentialFile,
   type ResumedSessionData,
   recordExitFail,
   ShellExecutionService,
-  saveApiKey,
   debugLogger,
   isValidEditorType,
   coreEvents,
   CoreEvent,
   flattenMemory,
   type MemoryChangedPayload,
-  writeToStdout,
   disableMouseEvents,
   enterAlternateScreen,
   enableMouseEvents,
@@ -84,11 +81,7 @@ import {
   generateSummary,
   type ConsentRequestPayload,
   type AgentsDiscoveredPayload,
-  ChangeAuthRequestedError,
-  ProjectIdRequiredError,
   buildUserSteeringHintPrompt,
-  logBillingEvent,
-  ApiKeyUpdatedEvent,
   LegacyAgentProtocol,
   type InjectionSource,
 } from '@google/gemini-cli-core';
@@ -135,7 +128,12 @@ import { useFolderTrust } from './hooks/useFolderTrust.js';
 import { useIdeTrustListener } from './hooks/useIdeTrustListener.js';
 import { type IdeIntegrationNudgeResult } from './IdeIntegrationNudge.js';
 import { appEvents, AppEvent, TransientMessageType } from '../utils/events.js';
-import { type UpdateObject } from './utils/updateCheck.js';
+import {
+  type LocalChangeSummary,
+  type UpdateObject,
+  acknowledgePendingLocalChanges,
+  loadPendingLocalChanges,
+} from './utils/updateCheck.js';
 import { setUpdateHandler } from '../utils/handleAutoUpdate.js';
 import {
   registerCleanup,
@@ -317,6 +315,17 @@ export const AppContainer = (props: AppContainerProps) => {
   const [settingsNonce, setSettingsNonce] = useState(0);
   const activeHooks = useHookDisplayState();
   const [updateInfo, setUpdateInfo] = useState<UpdateObject | null>(null);
+  const dismissUpdateInfo = useCallback(() => setUpdateInfo(null), []);
+  const [whatsChanged, setWhatsChanged] = useState<LocalChangeSummary | null>(
+    null,
+  );
+  useEffect(() => {
+    void loadPendingLocalChanges().then(setWhatsChanged);
+  }, []);
+  const dismissWhatsChanged = useCallback(() => {
+    setWhatsChanged(null);
+    void acknowledgePendingLocalChanges();
+  }, []);
   const [isTrustedFolder, setIsTrustedFolder] = useState<boolean | undefined>(
     () => isWorkspaceTrusted(settings.merged).isTrusted,
   );
@@ -722,8 +731,6 @@ export const AppContainer = (props: AppContainerProps) => {
     setAuthState,
     authError,
     onAuthError,
-    apiKeyDefaultValue,
-    reloadApiKey,
     accountSuspensionInfo,
     setAccountSuspensionInfo,
   } = useAuthCommand(
@@ -767,9 +774,7 @@ export const AppContainer = (props: AppContainerProps) => {
   // Derive auth state variables for backward compatibility with UIStateContext
   const isAuthDialogOpen = authState === AuthState.Updating;
   // TODO: Consider handling other auth types that should also skip the blocking screen
-  const isAuthenticating =
-    authState === AuthState.Unauthenticated &&
-    settings.merged.security.auth.selectedType !== AuthType.USE_GEMINI;
+  const isAuthenticating = authState === AuthState.Unauthenticated;
 
   // Session browser and resume functionality
   const isGeminiClientInitialized = config.getGeminiClient()?.isInitialized();
@@ -802,83 +807,24 @@ export const AppContainer = (props: AppContainerProps) => {
   const handleAuthSelect = useCallback(
     async (authType: AuthType | undefined, scope: LoadableSettingScope) => {
       if (authType) {
-        const previousAuthType =
-          config.getContentGeneratorConfig()?.authType ?? 'unknown';
-        if (authType === AuthType.LOGIN_WITH_GOOGLE) {
-          setAuthContext({ requiresRestart: true });
-        } else {
-          setAuthContext({});
-        }
-        await clearCachedCredentialFile();
-        settings.setValue(scope, 'security.auth.selectedType', authType);
+        setAuthContext({});
+        settings.setValue(scope, 'security.auth.selectedType', AuthType.AGY);
 
         try {
           config.setRemoteAdminSettings(undefined);
-          await config.refreshAuth(authType);
+          await config.refreshAuth(AuthType.AGY);
           setAuthState(AuthState.Authenticated);
-          logBillingEvent(
-            config,
-            new ApiKeyUpdatedEvent(previousAuthType, authType),
-          );
         } catch (e) {
-          if (e instanceof ChangeAuthRequestedError) {
-            return;
-          }
-          if (e instanceof ProjectIdRequiredError) {
-            // OAuth succeeded but account setup requires project ID
-            // Show the error message directly without "Failed to authenticate" prefix
-            onAuthError(getErrorMessage(e));
-            return;
-          }
           onAuthError(
             `Failed to authenticate: ${e instanceof Error ? e.message : String(e)}`,
           );
           return;
-        }
-
-        if (
-          authType === AuthType.LOGIN_WITH_GOOGLE &&
-          config.isBrowserLaunchSuppressed()
-        ) {
-          writeToStdout(`
-----------------------------------------------------------------
-Logging in with Google... Restarting Gemini CLI to continue.
-----------------------------------------------------------------
-          `);
-          await relaunchApp();
         }
       }
       setAuthState(AuthState.Authenticated);
     },
     [settings, config, setAuthState, onAuthError, setAuthContext],
   );
-
-  const handleApiKeySubmit = useCallback(
-    async (apiKey: string) => {
-      try {
-        onAuthError(null);
-        if (!apiKey.trim()) {
-          onAuthError('API key cannot be empty or whitespace only.');
-          return;
-        }
-
-        await saveApiKey(apiKey);
-        await reloadApiKey();
-        await config.refreshAuth(AuthType.USE_GEMINI);
-        setAuthState(AuthState.Authenticated);
-      } catch (e) {
-        onAuthError(
-          `Failed to save API key: ${e instanceof Error ? e.message : String(e)}`,
-        );
-      }
-    },
-    [setAuthState, onAuthError, reloadApiKey, config],
-  );
-
-  const handleApiKeyCancel = useCallback(() => {
-    // Go back to auth method selection
-    setAuthState(AuthState.Updating);
-  }, [setAuthState]);
 
   // Sync user tier from config when authentication changes
   useEffect(() => {
@@ -904,13 +850,6 @@ Logging in with Google... Restarting Gemini CLI to continue.
       settings.merged.security.auth.selectedType &&
       !settings.merged.security.auth.useExternal
     ) {
-      // We skip validation for Gemini API key here because it might be stored
-      // in the keychain, which we can't check synchronously.
-      // The useAuth hook handles validation for this case.
-      if (settings.merged.security.auth.selectedType === AuthType.USE_GEMINI) {
-        return;
-      }
-
       const authMethod = settings.merged.security.auth.selectedType;
       void (async () => {
         try {
@@ -2196,6 +2135,8 @@ Logging in with Google... Restarting Gemini CLI to continue.
     isPermissionsDialogOpen ||
     isAuthenticating ||
     isAuthDialogOpen ||
+    !!updateInfo ||
+    !!whatsChanged ||
     isEditorDialogOpen ||
     showPrivacyNotice ||
     showIdeRestartPrompt ||
@@ -2204,7 +2145,6 @@ Logging in with Google... Restarting Gemini CLI to continue.
     !!overageMenuRequest ||
     !!emptyWalletRequest ||
     isSessionBrowserOpen ||
-    authState === AuthState.AwaitingApiKeyInput ||
     isAwaitingLoginRestart ||
     !!newAgents;
 
@@ -2438,10 +2378,8 @@ Logging in with Google... Restarting Gemini CLI to continue.
       authError,
       accountSuspensionInfo,
       isAuthDialogOpen,
-      isAwaitingApiKeyInput: authState === AuthState.AwaitingApiKeyInput,
       isAwaitingLoginRestart,
       loginRestartMessage,
-      apiKeyDefaultValue,
       editorError,
       isEditorDialogOpen,
       showPrivacyNotice,
@@ -2520,6 +2458,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       rootUiRef,
       currentIDE,
       updateInfo,
+      whatsChanged,
       showIdeRestartPrompt,
       ideTrustRestartReason,
       isRestarting,
@@ -2632,6 +2571,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       rootUiRef,
       currentIDE,
       updateInfo,
+      whatsChanged,
       showIdeRestartPrompt,
       ideTrustRestartReason,
       isRestarting,
@@ -2644,8 +2584,6 @@ Logging in with Google... Restarting Gemini CLI to continue.
       embeddedShellFocused,
       showDebugProfiler,
       customDialog,
-      apiKeyDefaultValue,
-      authState,
       isAwaitingLoginRestart,
       loginRestartMessage,
       transientMessage,
@@ -2709,8 +2647,6 @@ Logging in with Google... Restarting Gemini CLI to continue.
       setQueueErrorMessage,
       addMessage,
       popAllMessages,
-      handleApiKeySubmit,
-      handleApiKeyCancel,
       setBannerVisible,
       setShortcutsHelpVisible,
       setCleanUiDetailsVisible,
@@ -2770,6 +2706,8 @@ Logging in with Google... Restarting Gemini CLI to continue.
       setVoiceModeEnabled: (value: boolean) => {
         setVoiceModeEnabled(value);
       },
+      dismissUpdateInfo,
+      dismissWhatsChanged,
     }),
     [
       handleThemeSelect,
@@ -2810,8 +2748,6 @@ Logging in with Google... Restarting Gemini CLI to continue.
       setQueueErrorMessage,
       addMessage,
       popAllMessages,
-      handleApiKeySubmit,
-      handleApiKeyCancel,
       setBannerVisible,
       setShortcutsHelpVisible,
       setCleanUiDetailsVisible,
@@ -2829,6 +2765,8 @@ Logging in with Google... Restarting Gemini CLI to continue.
       historyManager,
       getPreferredEditor,
       setVoiceModeEnabled,
+      dismissUpdateInfo,
+      dismissWhatsChanged,
     ],
   );
 

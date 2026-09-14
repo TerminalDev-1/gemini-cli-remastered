@@ -32,7 +32,6 @@ const RELEASE_DELAY_MS = 300;
 
 export function useVoiceMode({
   buffer,
-  config,
   settings,
   setQueueErrorMessage,
   isVoiceModeEnabled,
@@ -123,10 +122,7 @@ export function useVoiceMode({
     liveTranscriptionRef.current = '';
     stopRequestedRef.current = false;
 
-    const apiKey =
-      config.getContentGeneratorConfig()?.apiKey ||
-      process.env['GEMINI_API_KEY'] ||
-      '';
+    const apiKey = '';
 
     const startAsync = async () => {
       // If there's an active draining service, disconnect it immediately
@@ -161,24 +157,7 @@ export function useVoiceMode({
 
       if (cleanupIfStopped()) return;
 
-      const voiceBackend =
-        settings.experimental.voice?.backend ?? 'gemini-live';
-
-      if (!apiKey && voiceBackend === 'gemini-live') {
-        setQueueErrorMessage(
-          'Cloud voice mode requires a GEMINI_API_KEY. Please set it in your environment or ~/.gemini/.env.',
-        );
-        setIsRecording(false);
-        isRecordingRef.current = false;
-        setIsConnecting(false);
-        recordingInProgressRef.current = false;
-        lastFailureTimeRef.current = Date.now();
-        return;
-      }
-
-      if (voiceBackend === 'gemini-live') {
-        recorderRef.current = new AudioRecorder();
-      }
+      recorderRef.current = new AudioRecorder();
 
       const currentService = TranscriptionFactory.createProvider(
         settings.experimental.voice,
@@ -256,13 +235,8 @@ export function useVoiceMode({
 
         setIsConnecting(false);
 
-        const currentVoiceBackend =
-          settings.experimental.voice?.backend ?? 'gemini-live';
-
         recorderRef.current?.on('data', (chunk) => {
-          if (currentVoiceBackend === 'gemini-live') {
-            currentService.sendAudioChunk(chunk);
-          }
+          currentService.sendAudioChunk(chunk);
         });
         recorderRef.current?.on('error', (err) => {
           debugLogger.error('[Voice] Recorder error:', err);
@@ -291,12 +265,7 @@ export function useVoiceMode({
     };
 
     void startAsync();
-  }, [
-    config,
-    settings.experimental.voice,
-    setQueueErrorMessage,
-    stopVoiceRecording,
-  ]);
+  }, [settings.experimental.voice, setQueueErrorMessage, stopVoiceRecording]);
 
   useEffect(
     () => () => {

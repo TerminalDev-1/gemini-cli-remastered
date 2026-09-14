@@ -88,12 +88,7 @@ export const DEFAULT_EXCLUDED_ENV_VARS = [
   'GEMINI_CLI_IDE_SERVER_STDIO_ARGS',
 ];
 
-const AUTH_ENV_VAR_WHITELIST = [
-  'GEMINI_API_KEY',
-  'GOOGLE_API_KEY',
-  'GOOGLE_CLOUD_PROJECT',
-  'GOOGLE_CLOUD_LOCATION',
-];
+const AUTH_ENV_VAR_WHITELIST: string[] = [];
 
 /**
  * Sanitizes an environment variable value to prevent shell injection.
