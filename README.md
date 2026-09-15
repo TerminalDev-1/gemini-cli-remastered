@@ -8,11 +8,12 @@ the original Google Gemini authentication backends.
 
 ## Why was this created?
 
-RageSpy created Gemini CLI Remastered after encountering a bug in Google's
+TerminalDev-1 created Gemini CLI Remastered after encountering a bug in Google's
 Antigravity desktop app and Antigravity CLI. In that failure mode, everything
 the agent executed was launched as a subprocess, and windowed applications would
-not open. The maintainer's account is that Google would not fix the issue in
-time, so RageSpy released this project as an independent response to Google
+not open. The project took a lot of time and was driven by rage, spite, and
+anger at the company. TerminalDev-1's account is that Google would not fix the
+issue in time, so this project was released as an independent response to Google
 Corporation's handling of the bug.
 
 There is a second, practical reason this repository exists. After recovering an
@@ -23,7 +24,7 @@ that the work and its history are preserved.
 > If Google cannot fix its own bug in time, why should Google kill open-source
 > apps?
 
-That is the maintainer's position and the motivation behind this project. Gemini
+That is TerminalDev-1's position and the motivation behind this project. Gemini
 CLI Remastered is not an official Google product and is not affiliated with or
 endorsed by Google.
 
