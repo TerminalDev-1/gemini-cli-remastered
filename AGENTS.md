@@ -1,22 +1,23 @@
-# Gemini CLI AGY fork
+# Gemini CLI Remastered
 
-This file records the intentional divergence of this private fork from the
-official Google Gemini CLI repository. It is both an architecture note and a
-maintenance guide. When rebasing from upstream, review every section below; the
-upstream implementation still contains cloud Gemini authentication and update
-behavior that this fork deliberately does not use.
+This file records the intentional divergence of this standalone downstream
+project from the official Google Gemini CLI repository. It is both an
+architecture note and a maintenance guide. When rebasing from upstream, review
+every section below; the upstream implementation still contains cloud Gemini
+authentication and update behavior that this project deliberately does not use.
 
 ## Product boundary
 
-The fork keeps Gemini CLI's terminal-first React/Ink frontend, tool execution,
-session handling, MCP support, ACP support, A2A support, recording, and fake
-response facilities. The model backend is replaced with the locally installed
-Antigravity CLI (AGY). Model requests are therefore sent to the local AGY
-process rather than directly to Google's Gemini service.
+The project keeps Gemini CLI's terminal-first React/Ink frontend, tool
+execution, session handling, MCP support, ACP support, A2A support, recording,
+and fake response facilities. The model backend is replaced with the locally
+installed Antigravity CLI (AGY). Model requests are therefore sent to the local
+AGY process rather than directly to Google's Gemini service.
 
 AGY must be installed and authenticated separately. The frontend owns tool
 execution; AGY is asked only to produce text or frontend tool-call requests.
-This is a private fork and is not an upstream-compatible authentication build.
+This is an independent downstream project and is not an upstream-compatible
+authentication build.
 
 ## Runtime architecture
 
@@ -93,7 +94,7 @@ AGY is the only active authentication path.
   removed from core. API-key dialogs, API-key submit/cancel actions, API-key
   auth tests, and their snapshots were removed from the CLI.
 - The auth environment whitelist is empty. `GEMINI_API_KEY`, `GOOGLE_API_KEY`,
-  and the legacy API-key configuration are not used by this fork.
+  and the legacy API-key configuration are not used by this project.
 - API keys are no longer copied into Docker/LXC sandbox environments.
 - ACP no longer accepts API-key metadata, gateway URLs, or custom gateway
   headers. It advertises only the AGY authentication method and returns no
@@ -155,8 +156,8 @@ The upstream npm update path is intentionally disabled.
 - `handleAutoUpdate()` and `waitForUpdateCompletion()` are compatibility no-ops.
   They never run npm, npx, pnpm, bun, a binary updater, or another package
   manager.
-- `installationInfo` reports that the local fork must be rebuilt and restarted
-  instead of returning an npm update command.
+- `installationInfo` reports that the local project must be rebuilt and
+  restarted instead of returning an npm update command.
 - Interactive startup calls `startLocalUpdateWatcher()` and unregisters it on
   shutdown.
 
@@ -224,14 +225,14 @@ C:\Users\gamer\AppData\Roaming\npm\gemini.ps1
 C:\Users\gamer\AppData\Roaming\npm\gemini.cmd
 ```
 
-The global junction targets this fork's `packages/cli`; rebuilding the CLI
+The global junction targets this project's `packages/cli`; rebuilding the CLI
 refreshes `packages/cli/dist/index.js` used by the link.
 
 For profile-free command discovery, the preferred launcher on this host is also
 `C:\Users\gamer\AppData\Local\agy\bin\gemini.cmd`. It invokes the same
 `packages/cli\dist\index.js` with the system Node.js executable and is on the
-user PATH ahead of the npm shim. Both launchers start this fork; neither starts
-the upstream Gemini service or the AGY interactive shell directly.
+user PATH ahead of the npm shim. Both launchers start this project; neither
+starts the upstream Gemini service or the AGY interactive shell directly.
 
 ## File-level divergence map
 
@@ -243,7 +244,7 @@ the upstream Gemini service or the AGY interactive shell directly.
 - `packages/cli/src/ui/components/UpdateDialog.tsx` — pre-restart choices.
 - `packages/cli/src/ui/components/WhatsNewDialog.tsx` — post-restart
   plain-English summary.
-- `AGENTS.md` — this fork maintenance and architecture record.
+- `AGENTS.md` — this project's maintenance and architecture record.
 
 ### Core changes/removals
 
@@ -317,16 +318,16 @@ The prevention controls are:
 
 - The user PATH persistently contains `C:\Users\gamer\AppData\Roaming\npm`.
 - The linked package and both `gemini.ps1`/`gemini.cmd` shims are verified to
-  target this fork's `packages\cli` and `dist\index.js`.
+  target this project's `packages\cli` and `dist\index.js`.
 - Windows PowerShell CurrentUser execution policy is `Bypass`.
 - The optional profile at
   `C:\Users\gamer\Documents\WindowsPowerShell\Microsoft.PowerShell_profile.ps1`
   appends the npm global directory only when a parent process supplied a stale
   PATH. It is a fallback, not an authentication or backend requirement.
 - A clean Windows PowerShell 5.1 process resolves `gemini` and reports the
-  fork's `RR-release-preview` build string. If a currently open shell predates
-  the policy/PATH change, dot-source the profile once or close all Windows
-  Terminal windows and open a new process.
+  project's `RR-release-preview` build string. If a currently open shell
+  predates the policy/PATH change, dot-source the profile once or close all
+  Windows Terminal windows and open a new process.
 
 The reproduced false-update loop is fixed: a restart event can only be emitted
 after a real watched-file signature change, and stale or ambiguous pending state
@@ -342,7 +343,7 @@ global npm prefix before changing repository code.
 
 - Keep the AGY boundary local. Do not reintroduce API-key prompts, Google OAuth,
   Vertex/Gateway transport, Code Assist quota/experiment calls, or npm self-
-  updates without explicitly redesigning this fork.
+  updates without explicitly redesigning this project.
 - If AGY's stream schema or model-list format changes, update
   `agyContentGenerator.ts`, its tests, model dialogs, and ACP advertisements
   together.
@@ -353,7 +354,7 @@ global npm prefix before changing repository code.
   the current `dist` output, then run targeted tests/type checking appropriate
   to the touched packages.
 
-## Exact touched-file inventory for this fork revision
+## Exact touched-file inventory for this project revision
 
 The following list is the complete source-tree delta currently documented by
 this file. `M` means modified, `D` means deleted, and `A` means added.
@@ -362,6 +363,7 @@ this file. `M` means modified, `D` means deleted, and `A` means added.
 
 - `M package.json`
 - `M package-lock.json`
+- `M README.md`
 - `A AGENTS.md`
 
 ### A2A server
