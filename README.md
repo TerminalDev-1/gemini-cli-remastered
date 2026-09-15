@@ -27,8 +27,15 @@ HP Envy with HP Cloud Recovery, the maintainer accidentally lost an earlier,
 uncommitted version of the project. This version is committed and published so
 that the work and its history are preserved.
 
-> If Google cannot fix its own bug in time, why should Google kill open-source
-> apps?
+A third reason is to bring back Gemini CLI for consumers without requiring a
+Gemini API key. In TerminalDev-1's view, Gemini CLI has effectively been cut off
+for consumers. This project is therefore a direct stance against Google's
+handling of the Antigravity harness and its bugs.
+
+> I really find it hard not to like Google, but this is getting out of hand. If
+> they won't support Gemini CLI anymore, I will continue supporting it.
+>
+> — TerminalDev-1
 
 That is TerminalDev-1's position and the motivation behind this project. Gemini
 CLI Remastered is not an official Google product and is not affiliated with or
