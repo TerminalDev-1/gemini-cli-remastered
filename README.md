@@ -1,20 +1,26 @@
 # Gemini CLI Remastered
 
-Gemini CLI Remastered is an independent, community-maintained rewrite of the
-Gemini CLI runtime path. It keeps the terminal interface and agent loop, but
+> [!IMPORTANT]
+>
+> Gemini CLI Remastered is a community-maintained software fork of Google's
+> Gemini CLI. TerminalDev-1 created the Remastered modifications, not the entire
+> original Gemini CLI codebase. Although this repository is standalone on
+> GitHub, its source and history remain derived from the upstream project.
+
+Gemini CLI Remastered keeps the inherited terminal interface and agent loop, but
 routes model requests through an installed Antigravity CLI (`agy`) session
 instead of asking users for Gemini API keys or sending requests directly through
 the original Google Gemini authentication backends.
 
 ## Why was this created?
 
-TerminalDev-1 created Gemini CLI Remastered after encountering a bug in Google's
-Antigravity desktop app and Antigravity CLI. In that failure mode, everything
-the agent executed was launched as a subprocess, and windowed applications would
-not open. The project took a lot of time and was driven by rage, spite, and
-anger at the company. TerminalDev-1's account is that Google would not fix the
-issue in time, so this project was released as an independent response to Google
-Corporation's handling of the bug.
+TerminalDev-1 created the Gemini CLI Remastered fork and its modifications after
+encountering a bug in Google's Antigravity desktop app and Antigravity CLI. In
+that failure mode, everything the agent executed was launched as a subprocess,
+and windowed applications would not open. The project took a lot of time and was
+driven by rage, spite, and anger at the company. TerminalDev-1's account is that
+Google would not fix the issue in time, so this project was released as an
+independent response to Google Corporation's handling of the bug.
 
 There is a second, practical reason this repository exists. After recovering an
 HP Envy with HP Cloud Recovery, the maintainer accidentally lost an earlier,
